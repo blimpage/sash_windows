@@ -1,17 +1,25 @@
-# This is a template for a Ruby scraper on morph.io (https://morph.io)
-# including some code snippets below that you should find helpful
+require "scraperwiki"
+require "mechanize"
 
-# require 'scraperwiki'
-# require 'mechanize'
-#
-# agent = Mechanize.new
-#
+agent = Mechanize.new
+
 # # Read in a page
-# page = agent.get("http://foo.com")
-#
+page = agent.get("https://renovaterestorerecycle.com.au/index.php?subcat=6")
+
 # # Find somehing on the page using css selectors
-# p page.at('div.content')
-#
+products = page.search(".product")
+
+p "Products found: #{products.size}"
+
+available_products = products.reject do |product|
+  price_element = product.children.detect { |el| el["class"] == "price" }
+  raise "no price found" unless price_element
+  price = price_element.inner_text.downcase
+  price.include?("sold")
+end
+
+p "Available products: #{available_products.size}"
+
 # # Write out to the sqlite database using scraperwiki library
 # ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
 #
