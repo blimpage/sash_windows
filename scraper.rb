@@ -3,12 +3,11 @@ require "mechanize"
 
 agent = Mechanize.new
 
-# # Read in a page
-page = agent.get("https://renovaterestorerecycle.com.au/index.php?subcat=6")
-
 Product = Struct.new(:name, :description, :price, :url)
 
-def build_product(element:)
+ROOT_URL = "https://renovaterestorerecycle.com.au/"
+
+def build_product(element:, agent:)
   paragraphs = element.children.select { |el| el.name == "p" }
   name = paragraphs[0].inner_text.strip
   description = paragraphs[1].inner_text.strip
@@ -17,13 +16,33 @@ def build_product(element:)
   price = price_element.inner_text.downcase
 
   link_element = element.children.detect { |el| el.name == "a" }
-  url = link_element["href"]
+  href = link_element["href"]
+  url = agent.agent.resolve(href)
 
   Product.new(name, description, price, url)
 end
 
-# Find somehing on the page using css selectors
-products = page.search(".product").map { |element| build_product(element: element) }
+def get_products_from_page(url:, agent:)
+  page = agent.get(url)
+
+  product_elements = page.search(".product")
+
+  product_elements.map { |element| build_product(element: element, agent: agent) }
+end
+
+main_page = agent.get("#{ROOT_URL}index.php?subcat=6")
+
+page_urls = main_page
+  .at("#main_pane")
+  .search("a")
+  .select { |el| el.inner_text.downcase.include?("page") }
+  .map { |el| el["href"] }
+  .uniq
+  .map { |url| agent.agent.resolve(url) }
+
+p "page_urls: #{page_urls}"
+
+products = page_urls.flat_map { |page_url| get_products_from_page(url: page_url, agent: agent) }
 
 p "Products found: #{products.size}"
 
@@ -33,7 +52,14 @@ end
 
 p "Available products: #{available_products.size}"
 
-p available_products.inspect
+available_products.each do |product|
+  puts "\n--"
+  puts "Name: #{product.name}"
+  puts "Description: #{product.description}"
+  puts "Price: #{product.price}"
+  puts "URL: #{product.url}"
+  puts "--"
+end
 
 # # Write out to the sqlite database using scraperwiki library
 # ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
