@@ -6,19 +6,34 @@ agent = Mechanize.new
 # # Read in a page
 page = agent.get("https://renovaterestorerecycle.com.au/index.php?subcat=6")
 
-# # Find somehing on the page using css selectors
-products = page.search(".product")
+Product = Struct.new(:name, :description, :price, :url)
+
+def build_product(element:)
+  paragraphs = element.children.select { |el| el.name == "p" }
+  name = paragraphs[0].inner_text.strip
+  description = paragraphs[1].inner_text.strip
+
+  price_element = element.children.detect { |el| el["class"] == "price" }
+  price = price_element.inner_text.downcase
+
+  link_element = element.children.detect { |el| el.name == "a" }
+  url = link_element["href"]
+
+  Product.new(name, description, price, url)
+end
+
+# Find somehing on the page using css selectors
+products = page.search(".product").map { |element| build_product(element: element) }
 
 p "Products found: #{products.size}"
 
 available_products = products.reject do |product|
-  price_element = product.children.detect { |el| el["class"] == "price" }
-  raise "no price found" unless price_element
-  price = price_element.inner_text.downcase
-  price.include?("sold")
+  product.price.include?("sold")
 end
 
 p "Available products: #{available_products.size}"
+
+p available_products.inspect
 
 # # Write out to the sqlite database using scraperwiki library
 # ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
