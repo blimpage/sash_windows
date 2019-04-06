@@ -36,6 +36,13 @@ def get_products_from_page(url:, agent:)
   product_elements.map { |element| build_product(element: element, agent: agent) }
 end
 
+def load_existing_product_urls
+  ScraperWiki.select("* from data")
+    .map { |existing_product| existing_product["url"] }
+rescue # If the database table doesn't exist yet, SQLite will raise an error
+  []
+end
+
 def generate_mail_content(new_products:)
   header = "Hey, I found some new sash windows for you!"
   footer = "Okay bye!<br />https://morph.io/blimpage/sash_windows"
@@ -73,8 +80,7 @@ end
 
 puts "\n#{available_products.size} total available products found."
 
-existing_product_urls = ScraperWiki.select("* from data")
-  .map { |existing_product| existing_product["url"] }
+existing_product_urls = load_existing_product_urls
 
 new_products = available_products.reject do |potentially_new_product|
   existing_product_urls.include?(potentially_new_product.url)
