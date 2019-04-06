@@ -1,6 +1,8 @@
 require "scraperwiki"
 require "mechanize"
 
+ScraperWiki.config = { db: 'data.sqlite', default_table_name: 'data' }
+
 agent = Mechanize.new
 
 Product = Struct.new(:name, :description, :price, :url)
@@ -17,7 +19,7 @@ def build_product(element:, agent:)
 
   link_element = element.children.detect { |el| el.name == "a" }
   href = link_element["href"]
-  url = agent.agent.resolve(href)
+  url = agent.agent.resolve(href).to_s
 
   Product.new(name, description, price, url)
 end
@@ -40,35 +42,14 @@ page_urls = main_page
   .uniq
   .map { |url| agent.agent.resolve(url) }
 
-p "page_urls: #{page_urls}"
-
 products = page_urls.flat_map { |page_url| get_products_from_page(url: page_url, agent: agent) }
-
-p "Products found: #{products.size}"
 
 available_products = products.reject do |product|
   product.price.include?("sold")
 end
 
-p "Available products: #{available_products.size}"
-
 available_products.each do |product|
-  puts "\n--"
-  puts "Name: #{product.name}"
-  puts "Description: #{product.description}"
-  puts "Price: #{product.price}"
-  puts "URL: #{product.url}"
-  puts "--"
+  ScraperWiki.save_sqlite([:url], product.to_h)
 end
 
-# # Write out to the sqlite database using scraperwiki library
-# ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
-#
-# # An arbitrary query against the database
-# ScraperWiki.select("* from data where 'name'='peter'")
-
-# You don't have to do things with the Mechanize or ScraperWiki libraries.
-# You can use whatever gems you want: https://morph.io/documentation/ruby
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+puts "#{available_products.size} available products written to the DB. Bye!"
