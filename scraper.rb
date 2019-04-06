@@ -8,8 +8,6 @@ agent = Mechanize.new
 
 Product = Struct.new(:name, :description, :price, :url)
 
-ROOT_URL = "https://renovaterestorerecycle.com.au/"
-
 def build_product(element:, agent:)
   paragraphs = element.children.select { |el| el.name == "p" }
   name = paragraphs[0].inner_text.strip
@@ -26,9 +24,11 @@ def build_product(element:, agent:)
 end
 
 def get_products_from_page(url:, agent:)
+  puts "  Scraping page: #{url}"
   page = agent.get(url)
 
   product_elements = page.search(".product")
+  puts "    #{product_elements.size} products found."
 
   product_elements.map { |element| build_product(element: element, agent: agent) }
 end
@@ -50,7 +50,7 @@ def generate_mail_content(new_products:)
   [header, product_texts.join(separator), footer].join(separator)
 end
 
-main_page = agent.get("#{ROOT_URL}index.php?subcat=6")
+main_page = agent.get("https://renovaterestorerecycle.com.au/index.php?subcat=6")
 
 page_urls = main_page
   .at("#main_pane")
@@ -60,11 +60,15 @@ page_urls = main_page
   .uniq
   .map { |url| agent.agent.resolve(url) }
 
+puts "\n#{page_urls.size} pages found to scrape."
+
 products = page_urls.flat_map { |page_url| get_products_from_page(url: page_url, agent: agent) }
 
 available_products = products.reject do |product|
   product.price.include?("sold")
 end
+
+puts "\n#{available_products.size} total available products found."
 
 existing_product_urls = ScraperWiki.select("* from data")
   .map { |existing_product| existing_product["url"] }
@@ -74,18 +78,18 @@ new_products = available_products.reject do |potentially_new_product|
 end
 
 if new_products.any?
-  puts "#{new_products.size} new product(s) found!"
+  puts "\n#{new_products.size} new product(s) found!"
+
+  mail_content = generate_mail_content(new_products: new_products)
+  send_mail(html_content: mail_content)
 
   new_products.each do |product|
     ScraperWiki.save_sqlite([:url], product.to_h)
   end
 
-  puts "New products saved to the database."
+  puts "  New products saved to the database."
 
-  mail_content = generate_mail_content(new_products: new_products)
-  send_mail(html_content: mail_content)
-
-  puts "All done! Bye!"
+  puts "\nAll done! Bye!"
 else
-  puts "No new products found. Oh well. Seeya."
+  puts "\nNo new products found. Oh well. Seeya."
 end
