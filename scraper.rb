@@ -2,6 +2,9 @@ require "scraperwiki"
 require "mechanize"
 require_relative "send_mail"
 
+raise "Notification email address is not set" if ENV["MORPH_NOTIFICATION_EMAIL_ADDRESS"].nil?
+raise "Sendgrid API key is not set" if ENV["MORPH_SENDGRID_API_KEY"].nil?
+
 ScraperWiki.config = { db: 'data.sqlite', default_table_name: 'data' }
 
 agent = Mechanize.new
