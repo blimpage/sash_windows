@@ -1,6 +1,7 @@
 require "scraperwiki"
 require "mechanize"
 require_relative "scrape_rrr"
+require_relative "scrape_rp"
 require_relative "send_mail"
 
 raise "Notification email address is not set" if ENV["MORPH_NOTIFICATION_EMAIL_ADDRESS"].nil?
@@ -34,7 +35,9 @@ def generate_mail_content(new_products:)
   [header, product_texts.join(separator), footer].join(separator)
 end
 
-products = RRR.get_products(agent: agent)
+products = []
+products += RRR.get_products(agent: agent)
+products += RP.get_products(agent: agent)
 
 existing_product_urls = load_existing_product_urls
 
