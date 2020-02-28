@@ -28,8 +28,12 @@ module RP
     dimensions_element = element.search(".dim").first
     description = dimensions_element.inner_text.strip
 
+    # The price element can either contain just the price, or might contain both a
+    # <del> element with the original price and an <ins> element with a markdown price.
+    # If there's a markdown price then we want only that, otherwise the entire inner_text.
     price_element = element.search(".price").first
-    price = price_element.inner_text.strip
+    markdown_price_element = price_element.search("ins")&.first
+    price = (markdown_price_element || price_element).inner_text.strip
 
     link_element = element.search("a").first
     href = link_element["href"]
