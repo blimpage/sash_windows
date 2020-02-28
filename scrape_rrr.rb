@@ -2,6 +2,8 @@ require_relative "product"
 
 module RRR
   def self.get_products(agent:)
+    puts "\nScraping renovaterestorerecycle.com.au:"
+
     products = []
     pages_scraped_count = 0
 
@@ -19,9 +21,15 @@ module RRR
       next_page_url = get_next_page_url_from_page(page: current_page, agent: agent)
     end
 
-    puts "\n#{pages_scraped_count} pages scraped. #{products.count} total products found."
+    puts "\n  #{pages_scraped_count} pages scraped. #{products.count} total products found."
 
-    products
+    available_products = products.reject do |product|
+      product.price.include?("sold")
+    end
+
+    puts "\n  #{available_products.size} available product(s) found."
+
+    available_products
   end
 
   def self.build_product(element:, agent:)

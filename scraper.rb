@@ -36,15 +36,9 @@ end
 
 products = RRR.get_products(agent: agent)
 
-available_products = products.reject do |product|
-  product.price.include?("sold")
-end
-
-puts "\n#{available_products.size} available product(s) found."
-
 existing_product_urls = load_existing_product_urls
 
-new_products = available_products.reject do |potentially_new_product|
+new_products = products.reject do |potentially_new_product|
   existing_product_urls.include?(potentially_new_product.url)
 end
 
