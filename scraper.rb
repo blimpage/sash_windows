@@ -26,14 +26,21 @@ def build_product(element:, agent:)
   Product.new(name, description, price, url)
 end
 
-def get_products_from_page(url:, agent:)
-  puts "  Scraping page: #{url}"
-  page = agent.get(url)
+def get_products_from_page(page:, agent:)
+  puts "  Scraping page: #{page.uri}"
 
   product_elements = page.search(".product")
   puts "    #{product_elements.size} products found."
 
   product_elements.map { |element| build_product(element: element, agent: agent) }
+end
+
+def get_next_page_url_from_page(page:, agent:)
+  next_page_link = page.at("a.page-numbers.next")
+
+  return nil if next_page_link.nil?
+
+  agent.agent.resolve(next_page_link["href"])
 end
 
 def load_existing_product_urls
@@ -60,19 +67,24 @@ def generate_mail_content(new_products:)
   [header, product_texts.join(separator), footer].join(separator)
 end
 
-main_page = agent.get("https://renovaterestorerecycle.com.au/index.php?subcat=6")
+products = []
+pages_scraped_count = 0
 
-page_urls = main_page
-  .at("#main_pane")
-  .search("a")
-  .select { |el| el.inner_text.downcase.include?("page") }
-  .map { |el| el["href"] }
-  .uniq
-  .map { |url| agent.agent.resolve(url) }
+start_page_url = "https://www.renovaterestorerecycle.com.au/category/sash-windows/?post_type=rrr_stock"
+next_page_url = start_page_url
 
-puts "\n#{page_urls.size} pages found to scrape."
+until next_page_url.nil? do
+  current_page = agent.get(next_page_url)
 
-products = page_urls.flat_map { |page_url| get_products_from_page(url: page_url, agent: agent) }
+  products_from_current_page = get_products_from_page(page: current_page, agent: agent)
+
+  products += products_from_current_page
+  pages_scraped_count += 1
+
+  next_page_url = get_next_page_url_from_page(page: current_page, agent: agent)
+end
+
+puts "\n#{pages_scraped_count} pages scraped."
 
 available_products = products.reject do |product|
   product.price.include?("sold")
