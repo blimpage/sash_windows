@@ -12,11 +12,15 @@ agent = Mechanize.new
 Product = Struct.new(:name, :description, :price, :url)
 
 def build_product(element:, agent:)
-  paragraphs = element.children.select { |el| el.name == "p" }
-  name = paragraphs[0].inner_text.strip
-  description = paragraphs[1].inner_text.strip
+  name_element = element.children.detect { |el| el["class"] == "entry-title" }
+  name = name_element.inner_text.strip
 
-  price_element = element.children.detect { |el| el["class"] == "price" }
+  product_info_element = element.children.detect { |el| el["class"] == "product-info" }
+
+  description_elements = product_info_element.children.reject { |el| el["class"] == "price" }
+  description = description_elements.map(&:inner_text).map(&:strip).reject(&:empty?).join(" ")
+
+  price_element = product_info_element.children.detect { |el| el["class"] == "price" }
   price = price_element.inner_text.downcase
 
   link_element = element.children.detect { |el| el.name == "a" }
@@ -29,7 +33,7 @@ end
 def get_products_from_page(page:, agent:)
   puts "  Scraping page: #{page.uri}"
 
-  product_elements = page.search(".product")
+  product_elements = page.search("article.type-rrr_stock")
   puts "    #{product_elements.size} products found."
 
   product_elements.map { |element| build_product(element: element, agent: agent) }
@@ -84,13 +88,13 @@ until next_page_url.nil? do
   next_page_url = get_next_page_url_from_page(page: current_page, agent: agent)
 end
 
-puts "\n#{pages_scraped_count} pages scraped."
+puts "\n#{pages_scraped_count} pages scraped. #{products.count} total products found."
 
 available_products = products.reject do |product|
   product.price.include?("sold")
 end
 
-puts "\n#{available_products.size} total available products found."
+puts "\n#{available_products.size} available product(s) found."
 
 existing_product_urls = load_existing_product_urls
 
