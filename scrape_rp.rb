@@ -7,14 +7,24 @@ module RP
     products = []
     pages_scraped_count = 0
 
-    start_page_url = "https://www.renovatorsparadise.com.au/product-category/windows/sash-window/traditional-art-deco/"
+    start_page_url = "https://www.renovatorsparadise.com.au/product-category/windows/"
 
-    current_page = agent.get(start_page_url)
+    puts "  Finding pages to scrape."
+    page_urls = get_page_urls(starting_page: agent.get(start_page_url), agent: agent)
+    puts "    #{page_urls.size} page(s) of interest found.\n\n"
 
-    products_from_current_page = get_products_from_page(page: current_page, agent: agent)
 
-    products += products_from_current_page
-    pages_scraped_count += 1
+    products = []
+    pages_scraped_count = 0
+
+    page_urls.each do |page_url|
+      current_page = agent.get(page_url)
+
+      products_from_current_page = get_products_from_page(page: current_page, agent: agent)
+
+      products += products_from_current_page
+      pages_scraped_count += 1
+    end
 
     puts "\n  #{pages_scraped_count} pages scraped. #{products.count} total products found."
 
@@ -46,8 +56,50 @@ module RP
     puts "  Scraping page: #{page.uri}"
 
     product_elements = page.search(".product")
-    puts "    #{product_elements.size} products found."
+    puts "    #{product_elements.size} product(s) found."
 
     product_elements.map { |element| build_product(element: element, agent: agent) }
+  end
+
+  def self.get_page_urls(starting_page:, agent:)
+    categories = starting_page.search(".product-category")
+
+    if categories.empty?
+      # We've reached a page with products on it, so return the current page URL
+      return [starting_page.uri]
+    end
+
+    categories_we_care_about = categories.select do |category|
+      title = category.search("h2").first.inner_text.strip.downcase
+
+      should_include = category_words_to_include.any? { |word| title.include?(word) }
+      should_exclude = category_words_to_exclude.any? { |word| title.include?(word) }
+
+      should_include && !should_exclude
+    end
+
+    page_urls = categories_we_care_about.map do |category|
+      category_url = agent.agent.resolve(category.search("a").first["href"])
+
+      # Recursively call this method to go through all the pages until we find product listings.
+      get_page_urls(starting_page: agent.get(category_url), agent: agent)
+    end
+
+    page_urls.flatten
+  end
+
+  def self.category_words_to_include
+    [
+      "sash",
+      "interwar",
+      "art deco",
+    ]
+  end
+
+  def self.category_words_to_exclude
+    [
+      "colonial",
+      "sashes", # ignore categories that are just sashes without a casement
+    ]
   end
 end
